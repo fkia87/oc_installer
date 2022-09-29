@@ -21,6 +21,7 @@ if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
 fi
 
 install_pkg ocserv
+install_pkg ufw
 
 read -p "Please enter your current ssh port number: [22] " SSH_PORT
 [[ -z $SSH_PORT ]] && SSH_PORT=22
@@ -34,8 +35,6 @@ read -p "Enter VPN server IP address: [192.168.20.1] " IP
 NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< $IP)
 NETMASK=255.255.255.0
 echo "Netmask is set to $NETMASK."
-
-install_pkg ufw
 
 echo -e "Opening ports..."
 ufw allow ${SSH_PORT},${OC_PORT}/tcp > /dev/null 2>&1
