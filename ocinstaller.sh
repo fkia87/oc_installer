@@ -20,7 +20,6 @@ if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
     sysctl -p > /dev/null 2>&1
 fi
 
-echo "Installing \"ocserv\" package..."
 install_pkg ocserv
 
 read -p "Please enter your current ssh port number: [22] " SSH_PORT
