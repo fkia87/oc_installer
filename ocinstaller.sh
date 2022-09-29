@@ -1,0 +1,173 @@
+#!/bin/bash
+
+OCCONF=/etc/ocserv/ocserv.conf
+
+function install_pkg {
+while ! dpkg -l | grep $1 >/dev/null 2>&1
+do
+    echo "Installing $1..."
+    apt -y install $1 >/dev/null 2>&1
+    sleep 1
+done
+}
+#########################################
+[[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
+
+echo "Checking net.ipv4.ip_forward..."
+if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
+    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+    sysctl -p > /dev/null 2>&1
+fi
+
+echo "Installing \"ocserv\" package..."
+apt update >/dev/null 2>&1
+apt -y install ocserv >/dev/null 2>&1
+
+read -p "Please enter your current ssh port number: [22] " SSH_PORT
+[[ -z $SSH_PORT ]] && SSH_PORT=22
+read -p "Please enter port number for OpenConnect server: [4444] " OC_PORT
+[[ -z $OC_PORT ]] && OC_PORT=4444
+read -p "Please enter domain name: [oc.example.com] " $DOMAIN
+[[ -z $DOMAIN ]] && DOMAIN=oc.example.com
+EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
+read -p "Enter VPN server IP address: [192.168.20.1] " $IP
+[[ -z $IP ]] && IP=192.168.20.1
+NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< $IP)
+NETMASK=255.255.255.0
+echo "Netmask is set to $NETMASK."
+
+install_pkg ufw
+
+echo -e "Configuring ufw..."
+ufw allow ${SSH_PORT},${OC_PORT}/tcp > /dev/null 2>&1
+
+# find_mainif
+iflist=( $(find /sys/class/net/ | rev | cut -d / -f1 | rev | sed '/^$/d') )
+tmp=( $(ip route |grep default |sed -e 's/^\s*//;s/\s/\n/g;') )
+
+for var in "${tmp[@]}"; do
+    [[ " ${iflist[*]} " =~ " ${var} " ]] && MAINIF=$var
+done
+if [[ -z $MAINIF ]]; then
+    echo -e "\nCouldn't determine the main interface on the system.\n"
+    exit 1
+fi
+
+cat << EOF >> /etc/ufw/before.rules
+
+# NAT table rules
+*nat
+:POSTROUTING ACCEPT [0:0]
+-A POSTROUTING -s $IP/24 -o $MAINIF -j MASQUERADE
+
+# End each table with the 'COMMIT' line or these rules won't be processed
+COMMIT
+EOF
+
+sed -ie \
+"/allow dhcp client to work/ s/^/# allow forwarding for trusted network\n/" \
+/etc/ufw/before.rules
+sed -ie \
+"/allow dhcp client to work/ s/^/-A ufw-before-forward -s $NETWORK\/24 -j ACCEPT\n/" \
+/etc/ufw/before.rules
+sed -ie \
+"/allow dhcp client to work/ s/^/-A ufw-before-forward -d $NETWORK\/24 -j ACCEPT\n/" \
+/etc/ufw/before.rules
+sed -ie "/allow dhcp client to work/ s/^/\n/" /etc/ufw/before.rules
+sed -ie 's/ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
+ufw enable > /dev/null 2>&1
+systemctl restart ufw
+
+echo -e "Configuring ocserv..."
+sed -ie 's/^s\*auth\s*=\s*.*/#&/g' $OCCONF
+echo 'auth = "plain[passwd=/etc/ocserv/ocpasswd]"' >> $OCCONF
+sed -ie 's/^\s*tcp-port\s*=\s*.*/#&/g' $OCCONF
+sed -ie 's/^\s*udp-port\s*=\s*.*/#&/g' $OCCONF
+echo "tcp-port = $OC_PORT" >> $OCCONF
+sed -ie 's/^\s*try-mtu-discovery\s*=\s*.*/#&/g' $OCCONF
+echo "try-mtu-discovery = true" >> $OCCONF
+sed -ie 's/^\s*default-domain\s*=\s*.*/#&/g' $OCCONF
+echo "default-domain = $DOMAIN" >> $OCCONF
+sed -ie 's/^\s*ipv4-network\s*=\s*.*/#&/g' $OCCONF
+sed -ie 's/^\s*ipv4-netmask\s*=\s*.*/#&/g' $OCCONF
+echo "ipv4-network = $IP" >> $OCCONF
+echo "ipv4-netmask = $NETMASK" >> $OCCONF
+sed -ie 's/^\s*tunnel-all-dns\s*=\s*.*/#&/g' $OCCONF
+echo "tunnel-all-dns = true" >> $OCCONF
+sed -ie 's/^\s*dns\s*=\s*.*/#&/g' $OCCONF
+echo -e "dns = 8.8.8.8\ndns = 4.2.2.4" >> $OCCONF
+sed -ie 's/^\s*route\s*=\s*.*/#&/g' $OCCONF
+sed -ie 's/^\s*no-route\s*=\s*.*/#&/g' $OCCONF
+
+echo -e "Restarting ocserv service..."
+systemctl restart ocserv
+
+echo "Installing gnutls-bin..."
+install_pkg gnutls-bin
+
+echo "Creating certificate directories..."
+mkdir -p /etc/pki/ocserv/{cacerts,private,public}
+
+echo "Generating keys and certificates..."
+# Generate CA
+certtool --generate-privkey --outfile /etc/pki/ocserv/private/ca.key
+cat << EOF > /etc/pki/ocserv/cacerts/ca.tmpl
+cn = "AnyConnect VPN CA"
+organization = "myocserv"
+serial = 1
+expiration_days = -1
+ca
+signing_key
+cert_signing_key
+crl_signing_key
+EOF
+certtool --generate-self-signed \
+--load-privkey /etc/pki/ocserv/private/ca.key \
+--template /etc/pki/ocserv/cacerts/ca.tmpl \
+--outfile /etc/pki/ocserv/cacerts/ca.crt
+
+# Generating a local server certificate
+certtool --generate-privkey --outfile /etc/pki/ocserv/private/server.key
+cat << EOF > /etc/pki/ocserv/public/server.tmpl
+cn = "AnyConnect VPN Server"
+dns_name = "www.myocserv.com"
+organization = "myocserv"
+expiration_days = -1
+signing_key
+encryption_key
+tls_www_server
+EOF
+certtool --generate-certificate \
+--load-privkey /etc/pki/ocserv/private/server.key \
+--load-ca-certificate /etc/pki/ocserv/cacerts/ca.crt \
+--load-ca-privkey /etc/pki/ocserv/private/ca.key \
+--template /etc/pki/ocserv/public/server.tmpl \
+--outfile /etc/pki/ocserv/public/server.crt
+
+# Generating the client certificates
+certtool --generate-privkey --outfile user.key
+cat << EOF > /etc/pki/ocserv/public/user.tmpl
+cn = "AnyConnect VPN User"
+unit = "admins"
+expiration_days = -1
+signing_key
+tls_www_client
+EOF
+certtool --generate-certificate --load-privkey user.key \
+--load-ca-certificate /etc/pki/ocserv/cacerts/ca.crt \
+--load-ca-privkey /etc/pki/ocserv/private/ca.key \
+--template /etc/pki/ocserv/public/user.tmpl \
+--outfile /etc/pki/ocserv/public/user.crt
+
+echo -e "Configuring ocserv..."
+sed -ie 's/^\s*server-cert\s*=\s*.*/#&/g' $OCCONF
+sed -ie 's/^\s*server-key\s*=\s*.*/#&/g' $OCCONF
+sed -ie 's/^\s*ca-cert\s*=\s*.*/#&/g' $OCCONF
+cat << EOF >> $OCCONF
+server-cert = /etc/pki/ocserv/public/server.crt
+server-key = /etc/pki/ocserv/private/server.key
+ca-cert = /etc/pki/ocserv/cacerts/ca.crt
+EOF
+
+echo -e "Restarting ocserv service..."
+systemctl restart ocserv
