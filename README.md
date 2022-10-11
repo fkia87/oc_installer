@@ -5,6 +5,6 @@ This script works only on:
 * **Ubuntu and it's derivatives**
 * **Centos(RHEL) 7**
 
-It should also work on **Centos(RHEL) 8** but not tested.
+It should also work on recent versions of **Fedora** and it's derivatives but not tested.
 
 Just run `ocinstaller.sh` and follow the instructions.
