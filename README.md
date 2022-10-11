@@ -1,5 +1,5 @@
 # Openonnect Installer
-Installing and configuring a simple openconnect VPN server.
+Installing and configuring a simple openconnect VPN server with *username* and *password* authentication.
 
 This script works only on:
 * **Ubuntu and it's derivatives**
