@@ -105,11 +105,12 @@ if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
     sysctl -p > /dev/null 2>&1
 fi
 
+[[ "$(os)" == "ubuntu" ]] && { apt update; install_pkg ufw; install_pkg gnutls-bin; }
+
+[[ "$(os)" == "centos" ]] && { install_pkg gnutls-utils; install_pkg epel-release; }
+
 install_pkg ocserv
 
-[[ "$(os)" == "ubuntu" ]] && install_pkg ufw
-
-[[ "$(os)" == "centos" ]] && install_pkg gnutls-utils
 
 read -p "Please enter your current ssh port number: [22] " SSH_PORT
 [[ -z $SSH_PORT ]] && SSH_PORT=22
@@ -152,9 +153,6 @@ sed -ie 's/^\s*route\s*=\s*.*/#&/g' $OCCONF
 sed -ie 's/^\s*no-route\s*=\s*.*/#&/g' $OCCONF
 echo -e "Restarting ocserv service..."
 systemctl restart ocserv
-
-echo "Installing gnutls-bin..."
-install_pkg gnutls-bin
 
 echo "Creating certificate directories..."
 mkdir -p /etc/pki/ocserv/{cacerts,private,public}
