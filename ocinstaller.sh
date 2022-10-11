@@ -2,56 +2,36 @@
 
 OCCONF=/etc/ocserv/ocserv.conf
 
-function install_pkg {
-while ! dpkg -l | grep $1 >/dev/null 2>&1
-do
-    echo "Installing $1..."
-    apt update
-    apt -y install $1
-    sleep 1
-done
+function os {
+DISTRO=$(cat /etc/os-release | grep -e '^ID=' \
+| cut -d = -f 2 | sed -e 's/[[:punct:]]//g' \
+| tr [:upper:] [:lower:])
+echo $DISTRO
 }
-#########################################
-[[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
 
-echo "Checking net.ipv4.ip_forward..."
-if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
-    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-    sysctl -p > /dev/null 2>&1
-fi
+function install_pkg {
+case $(os) in
+centos)
+    while ! rpm -q $1 >/dev/null 2>&1
+    do
+        echo "Installing $1..."
+        yum -y install $1
+        sleep 1
+    done
+;;
+ubuntu)
+    while ! dpkg -l | grep $1 >/dev/null 2>&1
+    do
+        echo "Installing $1..."
+        apt update
+        apt -y install $1
+        sleep 1
+    done
+;;
+esac
+}
 
-install_pkg ocserv
-install_pkg ufw
-
-read -p "Please enter your current ssh port number: [22] " SSH_PORT
-[[ -z $SSH_PORT ]] && SSH_PORT=22
-read -p "Please enter port number for OpenConnect server: [4444] " OC_PORT
-[[ -z $OC_PORT ]] && OC_PORT=4444
-read -p "Please enter domain name: [oc.example.com] " DOMAIN
-[[ -z $DOMAIN ]] && DOMAIN=oc.example.com
-EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
-read -p "Enter VPN server IP address: [192.168.20.1] " IP
-[[ -z $IP ]] && IP=192.168.20.1
-NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< $IP)
-NETMASK=255.255.255.0
-echo "Netmask is set to $NETMASK."
-
-echo -e "Opening ports..."
-ufw allow ${SSH_PORT},${OC_PORT}/tcp > /dev/null 2>&1
-
-echo -e "Finding main interface..."
-iflist=( $(find /sys/class/net/ | rev | cut -d / -f1 | rev | sed '/^$/d') )
-tmp=( $(ip route |grep default |sed -e 's/^\s*//;s/\s/\n/g;') )
-
-for var in "${tmp[@]}"; do
-    [[ " ${iflist[*]} " =~ " ${var} " ]] && MAINIF=$var
-done
-if [[ -z $MAINIF ]]; then
-    echo -e "\nCouldn't determine the main interface on the system.\n"
-    exit 1
-fi
-echo -e "Main interface is $MAINIF."
-
+function firewall_cgf_ubuntu {
 echo -e "Configuring ufw..."
 if ! grep -e "-A POSTROUTING -s $NETWORK/24 -o $MAINIF -j MASQUERADE" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
@@ -88,8 +68,67 @@ if ! grep -e "-A ufw-before-forward -d $NETWORK/24 -j ACCEPT" \
     sed -ie "/allow dhcp client to work/ s/^/\n/" /etc/ufw/before.rules
 fi
 
+echo -e "Opening ports..."
+ufw allow ${SSH_PORT},${OC_PORT}/tcp > /dev/null 2>&1
 sed -ie 's/ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
 systemctl restart ufw
+}
+
+function firewall_cgf_centos {
+firewall-cmd --permanent --add-port=${OC_PORT}/tcp
+firewall-cmd --permanent --add-port=${SSH_PORT}/tcp
+firewall-cmd --permanent --add-rich-rule=\
+"rule family="ipv4" source address="$NETWORK/24" masquerade"
+systemctl reload firewalld
+}
+
+function find_mainif {
+echo -e "Finding main interface..."
+iflist=( $(find /sys/class/net/ | rev | cut -d / -f1 | rev | sed '/^$/d') )
+tmp=( $(ip route |grep default |sed -e 's/^\s*//;s/\s/\n/g;') )
+
+for var in "${tmp[@]}"; do
+    [[ " ${iflist[*]} " =~ " ${var} " ]] && MAINIF=$var
+done
+if [[ -z $MAINIF ]]; then
+    echo -e "\nCouldn't determine the main interface on the system.\n"
+    exit 1
+fi
+echo -e "Main interface is $MAINIF."
+}
+#########################################
+[[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
+
+echo "Checking net.ipv4.ip_forward..."
+if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
+    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+    sysctl -p > /dev/null 2>&1
+fi
+
+install_pkg ocserv
+
+[[ "$(os)" == "ubuntu" ]] && install_pkg ufw
+
+[[ "$(os)" == "centos" ]] && install_pkg gnutls-utils
+
+read -p "Please enter your current ssh port number: [22] " SSH_PORT
+[[ -z $SSH_PORT ]] && SSH_PORT=22
+read -p "Please enter port number for OpenConnect server: [4444] " OC_PORT
+[[ -z $OC_PORT ]] && OC_PORT=4444
+read -p "Please enter domain name: [oc.example.com] " DOMAIN
+[[ -z $DOMAIN ]] && DOMAIN=oc.example.com
+EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
+read -p "Enter VPN server IP address: [192.168.20.1] " IP
+[[ -z $IP ]] && IP=192.168.20.1
+NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< $IP)
+NETMASK=255.255.255.0
+echo "Netmask is set to $NETMASK."
+
+find_mainif
+
+[[ "$(os)" == "ubuntu" ]] && firewall_cgf_ubuntu
+
+[[ "$(os)" == "centos" ]] && firewall_cgf_centos
 
 echo -e "Configuring ocserv..."
 sed -ie 's/^\s*auth\s*=\s*.*/#&/g' $OCCONF
@@ -111,7 +150,6 @@ sed -ie 's/^\s*dns\s*=\s*.*/#&/g' $OCCONF
 echo -e "dns = 8.8.8.8\ndns = 4.2.2.4" >> $OCCONF
 sed -ie 's/^\s*route\s*=\s*.*/#&/g' $OCCONF
 sed -ie 's/^\s*no-route\s*=\s*.*/#&/g' $OCCONF
-
 echo -e "Restarting ocserv service..."
 systemctl restart ocserv
 
