@@ -83,7 +83,6 @@ systemctl reload firewalld
 }
 
 function find_mainif {
-echo -e "Finding main interface..."
 iflist=( $(find /sys/class/net/ | rev | cut -d / -f1 | rev | sed '/^$/d') )
 tmp=( $(ip route |grep default |sed -e 's/^\s*//;s/\s/\n/g;') )
 
@@ -94,7 +93,6 @@ if [[ -z $MAINIF ]]; then
     echo -e "\nCouldn't determine the main interface on the system.\n"
     exit 1
 fi
-echo -e "Main interface is $MAINIF."
 }
 #########################################
 [[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
