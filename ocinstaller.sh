@@ -109,7 +109,6 @@ fi
 
 install_pkg ocserv
 
-
 read -p "Please enter your current ssh port number: [22] " SSH_PORT
 [[ -z $SSH_PORT ]] && SSH_PORT=22
 read -p "Please enter port number for OpenConnect server: [4444] " OC_PORT
