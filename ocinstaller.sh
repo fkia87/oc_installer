@@ -9,6 +9,14 @@ DISTRO=$(cat /etc/os-release | grep -e '^ID=' \
 echo $DISTRO
 }
 
+function enable_ipforward {
+echo "Checking net.ipv4.ip_forward..."
+if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
+    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+    sysctl -p > /dev/null 2>&1
+fi
+}
+
 function install_pkg {
 case $(os) in
 centos)
@@ -97,11 +105,7 @@ fi
 #########################################
 [[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
 
-echo "Checking net.ipv4.ip_forward..."
-if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
-    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-    sysctl -p > /dev/null 2>&1
-fi
+enable_ipforward
 
 [[ "$(os)" == "ubuntu" ]] && { apt update; install_pkg ufw; install_pkg gnutls-bin; }
 
