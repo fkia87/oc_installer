@@ -19,7 +19,7 @@ fi
 
 function install_pkg {
 case $(os) in
-centos)
+centos | fedora)
     while ! rpm -q $1 >/dev/null 2>&1
     do
         echo "Installing $1..."
