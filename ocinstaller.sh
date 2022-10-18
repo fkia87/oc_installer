@@ -1,4 +1,5 @@
 #!/bin/bash
+
 source resources/os
 source resources/network
 source resources/pkg_management
