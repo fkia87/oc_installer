@@ -1,43 +1,9 @@
 #!/bin/bash
+source resources/os
+source resources/network
+source resources/pkg_management
 
 OCCONF=/etc/ocserv/ocserv.conf
-
-function os {
-DISTRO=$(cat /etc/os-release | grep -e '^ID=' \
-| cut -d = -f 2 | sed -e 's/[[:punct:]]//g' \
-| tr [:upper:] [:lower:])
-echo $DISTRO
-}
-
-function enable_ipforward {
-echo "Checking net.ipv4.ip_forward..."
-if grep '0' /proc/sys/net/ipv4/ip_forward >/dev/null; then
-    echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-    sysctl -p > /dev/null 2>&1
-fi
-}
-
-function install_pkg {
-case $(os) in
-centos | fedora)
-    while ! rpm -q $1 >/dev/null 2>&1
-    do
-        echo "Installing $1..."
-        yum -y install $1
-        sleep 1
-    done
-;;
-ubuntu)
-    while ! dpkg -l | grep $1 >/dev/null 2>&1
-    do
-        echo "Installing $1..."
-        apt update
-        apt -y install $1
-        sleep 1
-    done
-;;
-esac
-}
 
 function firewall_cgf_ubuntu {
 echo -e "Configuring ufw..."
@@ -90,18 +56,6 @@ firewall-cmd --permanent --add-rich-rule=\
 systemctl reload firewalld
 }
 
-function find_mainif {
-iflist=( $(find /sys/class/net/ | rev | cut -d / -f1 | rev | sed '/^$/d') )
-tmp=( $(ip route |grep default |sed -e 's/^\s*//;s/\s/\n/g;') )
-
-for var in "${tmp[@]}"; do
-    [[ " ${iflist[*]} " =~ " ${var} " ]] && MAINIF=$var
-done
-if [[ -z $MAINIF ]]; then
-    echo -e "\nCouldn't determine the main interface on the system.\n"
-    exit 1
-fi
-}
 #########################################
 [[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
 
