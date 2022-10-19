@@ -3,11 +3,12 @@
 source resources/os
 source resources/network
 source resources/pkg_management
+source resources/bash_colors
 
 OCCONF=/etc/ocserv/ocserv.conf
 
 function firewall_cgf_ubuntu {
-echo -e "Configuring ufw..."
+echo -e "${BLUE}Configuring ufw...${DECOLOR}"
 if ! grep -e "-A POSTROUTING -s $NETWORK/24 -o $MAINIF -j MASQUERADE" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
     cat << EOF >> /etc/ufw/before.rules
@@ -43,7 +44,7 @@ if ! grep -e "-A ufw-before-forward -d $NETWORK/24 -j ACCEPT" \
     sed -ie "/allow dhcp client to work/ s/^/\n/" /etc/ufw/before.rules
 fi
 
-echo -e "Opening ports..."
+echo -e "${BLUE}Opening ports...${DECOLOR}"
 ufw allow ${SSH_PORT},${OC_PORT}/tcp > /dev/null 2>&1
 sed -ie 's/ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
 systemctl restart ufw
@@ -68,10 +69,13 @@ enable_ipforward
 
 install_pkg ocserv
 
+echo -e "${BLUE}"
 read -p "Please enter your current ssh port number: [22] " SSH_PORT
 [[ -z $SSH_PORT ]] && SSH_PORT=22
 read -p "Please enter port number for OpenConnect server: [4444] " OC_PORT
 [[ -z $OC_PORT ]] && OC_PORT=4444
+read -p "Please enter maximum number of same clients: [2] " SAME_CLIENTS
+[[ -z $SAME_CLIENTS ]] && SAME_CLIENTS=2
 read -p "Please enter domain name: [oc.example.com] " DOMAIN
 [[ -z $DOMAIN ]] && DOMAIN=oc.example.com
 EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
@@ -79,15 +83,15 @@ read -p "Enter VPN server IP address: [192.168.20.1] " IP
 [[ -z $IP ]] && IP=192.168.20.1
 NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< $IP)
 NETMASK=255.255.255.0
-echo "Netmask is set to $NETMASK."
+echo -e "Netmask is set to $NETMASK.${DECOLOR}"
 
 find_mainif
 
-[[ "$(os)" == "ubuntu" ]] && firewall_cgf_ubuntu
+[[ "$(os)" == "ubuntu" ]] && firewall_cgf_ubuntu >/dev/null 2>&1
 
-[[ "$(os)" == "centos" ]] && firewall_cgf_centos
+[[ "$(os)" == "centos" ]] && firewall_cgf_centos >/dev/null 2>&1
 
-echo -e "Configuring ocserv..."
+echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
 sed -ie 's/^\s*auth\s*=\s*.*/#&/g' $OCCONF
 echo 'auth = "plain[passwd=/etc/ocserv/ocpasswd]"' >> $OCCONF
 sed -ie 's/^\s*tcp-port\s*=\s*.*/#&/g' $OCCONF
@@ -95,6 +99,8 @@ sed -ie 's/^\s*udp-port\s*=\s*.*/#&/g' $OCCONF
 echo "tcp-port = $OC_PORT" >> $OCCONF
 sed -ie 's/^\s*try-mtu-discovery\s*=\s*.*/#&/g' $OCCONF
 echo "try-mtu-discovery = true" >> $OCCONF
+sed -ie 's/^\s*max-same-clients\s*=\s*.*/#&/g' $OCCONF
+echo "max-same-clients = $SAME_CLIENTS" >> $OCCONF
 sed -ie 's/^\s*default-domain\s*=\s*.*/#&/g' $OCCONF
 echo "default-domain = $DOMAIN" >> $OCCONF
 sed -ie 's/^\s*ipv4-network\s*=\s*.*/#&/g' $OCCONF
@@ -107,13 +113,13 @@ sed -ie 's/^\s*dns\s*=\s*.*/#&/g' $OCCONF
 echo -e "dns = 8.8.8.8\ndns = 4.2.2.4" >> $OCCONF
 sed -ie 's/^\s*route\s*=\s*.*/#&/g' $OCCONF
 sed -ie 's/^\s*no-route\s*=\s*.*/#&/g' $OCCONF
-echo -e "Restarting ocserv service..."
+echo -e "${BLUE}Restarting ocserv service...${DECOLOR}"
 systemctl restart ocserv
 
-echo "Creating certificate directories..."
+echo -e "${BLUE}Creating certificate directories..."
 mkdir -p /etc/pki/ocserv/{cacerts,private,public}
 
-echo "Generating keys and certificates..."
+echo -e "Generating keys and certificates...${DECOLOR}"
 # Generate CA
 certtool --generate-privkey --outfile /etc/pki/ocserv/private/ca.key >/dev/null 2>&1
 cat << EOF > /etc/pki/ocserv/cacerts/ca.tmpl
@@ -164,7 +170,7 @@ certtool --generate-certificate --load-privkey user.key \
 --template /etc/pki/ocserv/public/user.tmpl \
 --outfile /etc/pki/ocserv/public/user.crt >/dev/null 2>&1
 
-echo -e "Configuring ocserv..."
+echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
 sed -ie 's/^\s*server-cert\s*=\s*.*/#&/g' $OCCONF
 sed -ie 's/^\s*server-key\s*=\s*.*/#&/g' $OCCONF
 sed -ie 's/^\s*ca-cert\s*=\s*.*/#&/g' $OCCONF
@@ -174,12 +180,11 @@ server-key = /etc/pki/ocserv/private/server.key
 ca-cert = /etc/pki/ocserv/cacerts/ca.crt
 EOF
 
-echo -e "Restarting ocserv service..."
-systemctl restart ocserv && echo -e "\n\
+echo -e "${BLUE}Restarting ocserv service...${DECOLOR}"
+systemctl restart ocserv && echo -e "${GREEN}\n\
 Successfully installed and configured \"ocserv\".\n
-Use \"ocpasswd\" command to manage users:\n
-Create:
+Use ${BGREEN}\"ocpasswd\"${GREEN} command to manage users:\n
+${YELLOW}Create:
 ocpasswd <username>\n\n\
 Delete:
-ocpasswd -d <username>
-"
+ocpasswd -d <username>\n${DECOLOR}"
