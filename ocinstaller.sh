@@ -59,7 +59,7 @@ systemctl reload firewalld
 }
 
 #########################################
-[[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
+checkuser
 
 enable_ipforward
 
