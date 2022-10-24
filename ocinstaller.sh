@@ -63,7 +63,7 @@ checkuser
 
 enable_ipforward
 
-[[ "$(os)" == "ubuntu" ]] && { apt update; install_pkg ufw; install_pkg gnutls-bin; }
+[[ "$(os)" == "ubuntu" ]] && { install_pkg ufw; install_pkg gnutls-bin; }
 
 [[ "$(os)" == "centos" ]] && { install_pkg gnutls-utils; install_pkg epel-release; }
 
