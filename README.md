@@ -7,8 +7,10 @@ This script works only on:
 
 It should also work on recent versions of **Fedora** and it's derivatives but not tested.
 
-Clone project with this command:
+## How to use:
 
-`git clone --recurse-submodules <github-url>`
+* Clone project using this command: 
 
-Then run `ocinstaller.sh` and follow the instructions.
+    `git clone --recurse-submodules <github-url>`
+
+* Then run `ocinstaller.sh` and follow the instructions.
