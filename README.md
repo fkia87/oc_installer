@@ -11,6 +11,6 @@ It should also work on recent versions of **Fedora** and it's derivatives but no
 
 * Clone project using this command: 
 
-    `git clone --recurse-submodules <github-url>`
+    `git clone <github-url>`
 
 * Then run `ocinstaller.sh` and follow the instructions.
