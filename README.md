@@ -9,8 +9,8 @@ It should also work on recent versions of **Fedora** and it's derivatives but no
 
 ## How to use:
 
-* Clone project using this command: 
+* Download or clone the project.
 
-    `git clone <github-url>`
+* Optionally edit CN or Organization information in `templates/`.
 
-* Then run `ocinstaller.sh` and follow the instructions.
+* Run `ocinstaller.sh` and follow the instructions.

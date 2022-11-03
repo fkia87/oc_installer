@@ -127,16 +127,7 @@ mkdir -p /etc/pki/ocserv/{cacerts,private,public}
 echo -e "Generating keys and certificates...${DECOLOR}"
 # Generate CA
 certtool --generate-privkey --outfile /etc/pki/ocserv/private/ca.key >/dev/null 2>&1
-cat << EOF > /etc/pki/ocserv/cacerts/ca.tmpl
-cn = "AnyConnect VPN CA"
-organization = "myocserv"
-serial = 1
-expiration_days = -1
-ca
-signing_key
-cert_signing_key
-crl_signing_key
-EOF
+cp templates/ca.tmpl /etc/pki/ocserv/cacerts/ca.tmpl
 certtool --generate-self-signed \
 --load-privkey /etc/pki/ocserv/private/ca.key \
 --template /etc/pki/ocserv/cacerts/ca.tmpl \
@@ -144,15 +135,7 @@ certtool --generate-self-signed \
 
 # Generating a local server certificate
 certtool --generate-privkey --outfile /etc/pki/ocserv/private/server.key >/dev/null 2>&1
-cat << EOF > /etc/pki/ocserv/public/server.tmpl
-cn = "AnyConnect VPN Server"
-dns_name = "www.myocserv.com"
-organization = "myocserv"
-expiration_days = -1
-signing_key
-encryption_key
-tls_www_server
-EOF
+cp templates/server.tmpl /etc/pki/ocserv/public/server.tmpl
 certtool --generate-certificate \
 --load-privkey /etc/pki/ocserv/private/server.key \
 --load-ca-certificate /etc/pki/ocserv/cacerts/ca.crt \
@@ -162,13 +145,7 @@ certtool --generate-certificate \
 
 # Generating the client certificates
 certtool --generate-privkey --outfile user.key >/dev/null 2>&1
-cat << EOF > /etc/pki/ocserv/public/user.tmpl
-cn = "AnyConnect VPN User"
-unit = "admins"
-expiration_days = -1
-signing_key
-tls_www_client
-EOF
+cp templates/user.tmpl /etc/pki/ocserv/public/user.tmpl
 certtool --generate-certificate --load-privkey user.key \
 --load-ca-certificate /etc/pki/ocserv/cacerts/ca.crt \
 --load-ca-privkey /etc/pki/ocserv/private/ca.key \
