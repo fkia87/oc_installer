@@ -1,9 +1,13 @@
 #!/bin/bash
 
+[[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
+
+rm -rf resources
 git clone https://github.com/fkia87/resources.git || \
 { echo -e "Error downloading required files from Github.
 Check if \"Git\" is installed and your internet connection is OK." >&2; \
 exit 1; }
+chmod -R go+rw resources
 
 source resources/os
 source resources/network
@@ -31,27 +35,27 @@ fi
 # Adding required firewall rules
 if ! grep -e "# allow forwarding for trusted network" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
-    sed -ie \
+    sed -i \
     "/allow dhcp client to work/ s/^/# allow forwarding for trusted network\n/" \
     /etc/ufw/before.rules
 fi
 if ! grep -e "-A ufw-before-forward -s $NETWORK/24 -j ACCEPT" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
-    sed -ie \
+    sed -i \
     "/allow dhcp client to work/ s/^/-A ufw-before-forward -s $NETWORK\/24 -j ACCEPT\n/" \
     /etc/ufw/before.rules
 fi
 if ! grep -e "-A ufw-before-forward -d $NETWORK/24 -j ACCEPT" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
-    sed -ie \
+    sed -i \
     "/allow dhcp client to work/ s/^/-A ufw-before-forward -d $NETWORK\/24 -j ACCEPT\n/" \
     /etc/ufw/before.rules
-    sed -ie "/allow dhcp client to work/ s/^/\n/" /etc/ufw/before.rules
+    sed -i "/allow dhcp client to work/ s/^/\n/" /etc/ufw/before.rules
 fi
 
 echo -e "${BLUE}Opening ports...${DECOLOR}"
 ufw allow ${SSH_PORT},${OC_PORT}/tcp > /dev/null 2>&1
-sed -ie 's/ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
+sed -i 's/ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
 systemctl restart ufw
 }
 
@@ -64,8 +68,6 @@ systemctl reload firewalld
 }
 
 #########################################
-checkuser
-
 enable_ipforward
 
 [[ "$(os)" == "ubuntu" ]] && { install_pkg ufw; install_pkg gnutls-bin; }
@@ -84,8 +86,16 @@ read -p "Please enter maximum number of same clients: [2] " SAME_CLIENTS
 read -p "Please enter domain name: [oc.example.com] " DOMAIN
 [[ -z $DOMAIN ]] && DOMAIN=oc.example.com
 EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
-read -p "Enter VPN server IP address: [192.168.20.1] " IP
+read -p "Enter VPN server local IP address: [192.168.20.1] " IP
 [[ -z $IP ]] && IP=192.168.20.1
+while ! check_ipprivate $IP
+do
+    echo -e "${RED}Please enter a class C private IP address."
+    echo -e "You can use an IP address within the range \
+${BRED}192.168.0.0${RED} to ${BRED}192.168.255.255${RED}.${BLUE}"
+    read -p "Enter VPN server local IP address: [192.168.20.1] " IP
+    [[ -z $IP ]] && IP=192.168.20.1
+done
 NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< $IP)
 NETMASK=255.255.255.0
 echo -e "Netmask is set to $NETMASK.${DECOLOR}"
@@ -97,27 +107,27 @@ find_mainif
 [[ "$(os)" == "centos" ]] && firewall_cgf_centos >/dev/null 2>&1
 
 echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
-sed -ie 's/^\s*auth\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*auth\s*=\s*.*/#&/g' $OCCONF
 echo 'auth = "plain[passwd=/etc/ocserv/ocpasswd]"' >> $OCCONF
-sed -ie 's/^\s*tcp-port\s*=\s*.*/#&/g' $OCCONF
-sed -ie 's/^\s*udp-port\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*tcp-port\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*udp-port\s*=\s*.*/#&/g' $OCCONF
 echo "tcp-port = $OC_PORT" >> $OCCONF
-sed -ie 's/^\s*try-mtu-discovery\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*try-mtu-discovery\s*=\s*.*/#&/g' $OCCONF
 echo "try-mtu-discovery = true" >> $OCCONF
-sed -ie 's/^\s*max-same-clients\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*max-same-clients\s*=\s*.*/#&/g' $OCCONF
 echo "max-same-clients = $SAME_CLIENTS" >> $OCCONF
-sed -ie 's/^\s*default-domain\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*default-domain\s*=\s*.*/#&/g' $OCCONF
 echo "default-domain = $DOMAIN" >> $OCCONF
-sed -ie 's/^\s*ipv4-network\s*=\s*.*/#&/g' $OCCONF
-sed -ie 's/^\s*ipv4-netmask\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*ipv4-network\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*ipv4-netmask\s*=\s*.*/#&/g' $OCCONF
 echo "ipv4-network = $IP" >> $OCCONF
 echo "ipv4-netmask = $NETMASK" >> $OCCONF
-sed -ie 's/^\s*tunnel-all-dns\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*tunnel-all-dns\s*=\s*.*/#&/g' $OCCONF
 echo "tunnel-all-dns = true" >> $OCCONF
-sed -ie 's/^\s*dns\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*dns\s*=\s*.*/#&/g' $OCCONF
 echo -e "dns = 8.8.8.8\ndns = 4.2.2.4" >> $OCCONF
-sed -ie 's/^\s*route\s*=\s*.*/#&/g' $OCCONF
-sed -ie 's/^\s*no-route\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*route\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*no-route\s*=\s*.*/#&/g' $OCCONF
 echo -e "${BLUE}Restarting ocserv service...${DECOLOR}"
 systemctl restart ocserv
 
@@ -153,9 +163,9 @@ certtool --generate-certificate --load-privkey user.key \
 --outfile /etc/pki/ocserv/public/user.crt >/dev/null 2>&1
 
 echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
-sed -ie 's/^\s*server-cert\s*=\s*.*/#&/g' $OCCONF
-sed -ie 's/^\s*server-key\s*=\s*.*/#&/g' $OCCONF
-sed -ie 's/^\s*ca-cert\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*server-cert\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*server-key\s*=\s*.*/#&/g' $OCCONF
+sed -i 's/^\s*ca-cert\s*=\s*.*/#&/g' $OCCONF
 cat << EOF >> $OCCONF
 server-cert = /etc/pki/ocserv/public/server.crt
 server-key = /etc/pki/ocserv/private/server.key
