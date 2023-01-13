@@ -2,17 +2,22 @@
 
 [[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
 
-rm -rf resources
-git clone https://github.com/fkia87/resources.git || \
-{ echo -e "Error downloading required files from Github.
-Check if \"Git\" is installed and your internet connection is OK." >&2; \
-exit 1; }
-chmod -R go+rw resources
+files=("resources/pkg_management" "resources/os" "resources/network" "resources/bash_colors")
 
-source resources/os
-source resources/network
-source resources/pkg_management
-source resources/bash_colors
+if ! [[ -f ${files[0]} ]] \
+|| ! [[ -f ${files[1]} ]] \
+|| ! [[ -f ${files[2]} ]] \
+|| ! [[ -f ${files[3]} ]]; then
+    rm -rf resources
+    git clone https://github.com/fkia87/resources.git || \
+    { echo -e "Error downloading required files from Github.
+Check if \"Git\" is installed and your internet connection is OK." >&2; \
+    exit 1; }
+fi
+
+for file in ${files[@]}; do
+    source $file
+done
 
 OCCONF=/etc/ocserv/ocserv.conf
 
