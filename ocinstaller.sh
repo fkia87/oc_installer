@@ -65,6 +65,7 @@ systemctl restart ufw
 }
 
 function firewall_cgf_centos {
+firewall-cmd --version > /dev/null 2>&1 || { install_pkg firewalld; systemctl enable --now firewalld; }
 firewall-cmd --permanent --add-port=${OC_PORT}/tcp
 firewall-cmd --permanent --add-port=${SSH_PORT}/tcp
 firewall-cmd --permanent --add-rich-rule=\
@@ -76,8 +77,8 @@ systemctl reload firewalld
 enable_ipforward
 
 [[ "$(os)" == "ubuntu" ]] && { install_pkg ufw; install_pkg gnutls-bin; }
-
 [[ "$(os)" == "centos" ]] && { install_pkg gnutls-utils; install_pkg epel-release; }
+[[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils
 
 install_pkg ocserv
 
@@ -108,8 +109,8 @@ echo -e "Netmask is set to $NETMASK.${DECOLOR}"
 find_mainif
 
 [[ "$(os)" == "ubuntu" ]] && firewall_cgf_ubuntu >/dev/null 2>&1
-
 [[ "$(os)" == "centos" ]] && firewall_cgf_centos >/dev/null 2>&1
+[[ "$(os)" == "fedora" ]] && firewall_cgf_centos >/dev/null 2>&1
 
 echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
 sed -i 's/^\s*auth\s*=\s*.*/#&/g' $OCCONF

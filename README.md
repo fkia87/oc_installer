@@ -4,8 +4,7 @@ Installing and configuring a simple openconnect VPN server with *username* and *
 This script works only on:
 * **Ubuntu** and it's derivatives
 * **Centos**
-
-It should also work on recent versions of **Fedora** and it's derivatives but not tested.
+* **Fedora**
 
 ## How to use:
 
