@@ -179,6 +179,7 @@ ca-cert = /etc/pki/ocserv/cacerts/ca.crt
 EOF
 
 echo -e "${BLUE}Restarting ocserv service...${DECOLOR}"
+systemctl enable ocserv
 systemctl restart ocserv && echo -e "${GREEN}\n\
 Successfully installed and configured \"ocserv\".\n
 Use ${BGREEN}\"ocpasswd\"${GREEN} command to manage users:\n
