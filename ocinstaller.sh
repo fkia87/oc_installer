@@ -21,7 +21,7 @@ done
 
 OCCONF=/etc/ocserv/ocserv.conf
 
-function firewall_cgf_ubuntu {
+function firewall_cfg_ubuntu {
 echo -e "${BLUE}Configuring ufw...${DECOLOR}"
 if ! grep -e "-A POSTROUTING -s $NETWORK/24 -o $MAINIF -j MASQUERADE" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
@@ -64,7 +64,7 @@ sed -i 's/ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
 systemctl restart ufw
 }
 
-function firewall_cgf_centos {
+function firewall_cfg_centos {
 firewall-cmd --version > /dev/null 2>&1 || { install_pkg firewalld; systemctl enable --now firewalld; }
 firewall-cmd --permanent --add-port=${OC_PORT}/tcp
 firewall-cmd --permanent --add-port=${SSH_PORT}/tcp
@@ -108,9 +108,9 @@ echo -e "Netmask is set to $NETMASK.${DECOLOR}"
 
 find_mainif
 
-[[ "$(os)" == "ubuntu" ]] && firewall_cgf_ubuntu >/dev/null 2>&1
-[[ "$(os)" == "centos" ]] && firewall_cgf_centos >/dev/null 2>&1
-[[ "$(os)" == "fedora" ]] && firewall_cgf_centos >/dev/null 2>&1
+[[ "$(os)" == "ubuntu" ]] && firewall_cfg_ubuntu >/dev/null 2>&1
+[[ "$(os)" == "centos" ]] && firewall_cfg_centos >/dev/null 2>&1
+[[ "$(os)" == "fedora" ]] && firewall_cfg_centos >/dev/null 2>&1
 
 echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
 sed -i 's/^\s*auth\s*=\s*.*/#&/g' $OCCONF
