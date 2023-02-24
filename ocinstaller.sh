@@ -22,7 +22,7 @@ done
 OCCONF=/etc/ocserv/ocserv.conf
 
 function firewall_cfg_ufw {
-echo -e "${BLUE}Configuring firewall: \"ufw\"${DECOLOR}"
+echo -e "${BLUE}Configuring firewall: \"ufw\"...${DECOLOR}"
 if ! grep -e "-A POSTROUTING -s $NETWORK/24 -o $MAINIF -j MASQUERADE" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
     cat << EOF >> /etc/ufw/before.rules
@@ -65,7 +65,7 @@ systemctl restart ufw
 }
 
 function firewall_cfg_firewalld {
-echo -e "${BLUE}Configuring firewall: \"firewalld\"${DECOLOR}"
+echo -e "${BLUE}Configuring firewall: \"firewalld\"...${DECOLOR}"
 firewall-cmd --version > /dev/null 2>&1 || { install_pkg firewalld; systemctl enable --now firewalld; }
 firewall-cmd --permanent --add-port=${OC_PORT}/tcp
 firewall-cmd --permanent --add-port=${SSH_PORT}/tcp
@@ -75,7 +75,7 @@ systemctl reload firewalld
 }
 
 function firewall_cfg_iptables {
-echo -e "${BLUE}Configuring firewall: \"iptables\"${DECOLOR}"
+echo -e "${BLUE}Configuring firewall: \"iptables\"...${DECOLOR}"
 iptables -A INPUT -p tcp --dport ${OC_PORT} -j ACCEPT
 iptables -A INPUT -p tcp --dport ${SSH_PORT} -j ACCEPT
 iptables -A FORWARD -s ${NETWORK}/24 -j ACCEPT
@@ -149,11 +149,11 @@ echo -e "Netmask is set to $NETMASK.${DECOLOR}"
 find_mainif
 
 if [[ -z $FW ]]; then
-    [[ "$(os)" == "ubuntu" ]] && firewall_cfg_ufw >/dev/null 2>&1
-    [[ "$(os)" == "centos" ]] && firewall_cfg_firewalld >/dev/null 2>&1
-    [[ "$(os)" == "fedora" ]] && firewall_cfg_firewalld >/dev/null 2>&1
+    [[ "$(os)" == "ubuntu" ]] && firewall_cfg_ufw
+    [[ "$(os)" == "centos" ]] && firewall_cfg_firewalld
+    [[ "$(os)" == "fedora" ]] && firewall_cfg_firewalld
 else
-    firewall_cfg_$FW >/dev/null 2>&1
+    firewall_cfg_$FW
 fi
 
 echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
