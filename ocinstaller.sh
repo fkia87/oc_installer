@@ -114,7 +114,7 @@ done
 
 enable_ipforward
 
-[[ "$(os)" == "ubuntu" ]] && { install_pkg ufw; install_pkg gnutls-bin; }
+[[ "$(os)" == "ubuntu" ]] && install_pkg gnutls-bin
 [[ "$(os)" == "centos" ]] && { install_pkg gnutls-utils; install_pkg epel-release; }
 [[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils
 
