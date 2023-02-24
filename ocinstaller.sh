@@ -116,11 +116,9 @@ done
 
 enable_ipforward
 
-[[ "$(os)" == "ubuntu" ]] && install_pkg gnutls-bin
-[[ "$(os)" == "centos" ]] && { install_pkg gnutls-utils; install_pkg epel-release; }
-[[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils
-
-install_pkg ocserv
+[[ "$(os)" == "ubuntu" ]] && install_pkg gnutls-bin ocserv
+[[ "$(os)" == "centos" ]] && install_pkg gnutls-utils epel-release ocserv
+[[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils ocserv
 
 echo -e "${BLUE}"
 read -p "Please enter your current ssh port number: [22] " SSH_PORT
