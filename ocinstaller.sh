@@ -21,7 +21,7 @@ done
 
 OCCONF=/etc/ocserv/ocserv.conf
 
-function firewall_cfg_ubuntu {
+function firewall_cfg_ufw {
 echo -e "${BLUE}Configuring ufw...${DECOLOR}"
 if ! grep -e "-A POSTROUTING -s $NETWORK/24 -o $MAINIF -j MASQUERADE" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
@@ -64,7 +64,7 @@ sed -i 's/ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
 systemctl restart ufw
 }
 
-function firewall_cfg_centos {
+function firewall_cfg_firewalld {
 firewall-cmd --version > /dev/null 2>&1 || { install_pkg firewalld; systemctl enable --now firewalld; }
 firewall-cmd --permanent --add-port=${OC_PORT}/tcp
 firewall-cmd --permanent --add-port=${SSH_PORT}/tcp
@@ -73,7 +73,45 @@ firewall-cmd --permanent --add-rich-rule=\
 systemctl reload firewalld
 }
 
-#########################################
+function firewall_cfg_iptables {
+iptables -A INPUT -p tcp --sport ${OC_PORT} -j ACCEPT
+iptables -A INPUT -p tcp --sport ${SSH_PORT} -j ACCEPT
+iptables -A FORWARD -s ${NETWORK}/24 -j ACCEPT
+iptables -A FORWARD -d ${NETWORK}/24 -j ACCEPT
+iptables -t nat -A POSTROUTING -j MASQUERADE
+mkdir -p /etc/iptables/
+iptables-save > /etc/iptables/rules.v4 || \
+echo -e "${RED}WARNING: \"iptables-save\" didn't work! rules will be lost after reboot!${DECOLOR}"
+}
+
+function print_help {
+echo -e "\nUsage:                                $0 [-fw <firewall_name>] [-h]\n"
+echo -e "Switches:\n"
+echo "-fw, --firewall                       The name of the firewall you are currently using if needed"
+echo -e "-h, --help                            Print this help\n"
+}
+
+# Processing switches #################################################################################
+while (( $# > 0 )); do
+    case $1 in
+    --firewall|-fw)
+        shift
+        if [[ $FW == "iptables" ]] || [[ $FW == "ufw" ]] || [[ $FW == "firewalld" ]]; then
+            FW=$1
+        else
+            echo -e "${RED}Invalid firewall name.${DECOLOR}"
+            echo -e "${RED}Use either \"iptables\", \"ufw\" or \"firewalld\".${DECOLOR}"
+            exit 1
+        fi
+        shift
+        ;;
+    --help|-h)
+        print_help
+    esac
+done
+
+#######################################################################################################
+
 enable_ipforward
 
 [[ "$(os)" == "ubuntu" ]] && { install_pkg ufw; install_pkg gnutls-bin; }
@@ -108,9 +146,13 @@ echo -e "Netmask is set to $NETMASK.${DECOLOR}"
 
 find_mainif
 
-[[ "$(os)" == "ubuntu" ]] && firewall_cfg_ubuntu >/dev/null 2>&1
-[[ "$(os)" == "centos" ]] && firewall_cfg_centos >/dev/null 2>&1
-[[ "$(os)" == "fedora" ]] && firewall_cfg_centos >/dev/null 2>&1
+if [[ -z $FW ]]; then
+    [[ "$(os)" == "ubuntu" ]] && firewall_cfg_ufw >/dev/null 2>&1
+    [[ "$(os)" == "centos" ]] && firewall_cfg_firewalld >/dev/null 2>&1
+    [[ "$(os)" == "fedora" ]] && firewall_cfg_firewalld >/dev/null 2>&1
+else
+    firewall_cfg_$1 >/dev/null 2>&1
+fi
 
 echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
 sed -i 's/^\s*auth\s*=\s*.*/#&/g' $OCCONF
