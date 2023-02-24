@@ -22,7 +22,7 @@ done
 OCCONF=/etc/ocserv/ocserv.conf
 
 function firewall_cfg_ufw {
-echo -e "${BLUE}Configuring ufw...${DECOLOR}"
+echo -e "${BLUE}Configuring firewall: \"ufw\"${DECOLOR}"
 if ! grep -e "-A POSTROUTING -s $NETWORK/24 -o $MAINIF -j MASQUERADE" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
     cat << EOF >> /etc/ufw/before.rules
@@ -65,6 +65,7 @@ systemctl restart ufw
 }
 
 function firewall_cfg_firewalld {
+echo -e "${BLUE}Configuring firewall: \"firewalld\"${DECOLOR}"
 firewall-cmd --version > /dev/null 2>&1 || { install_pkg firewalld; systemctl enable --now firewalld; }
 firewall-cmd --permanent --add-port=${OC_PORT}/tcp
 firewall-cmd --permanent --add-port=${SSH_PORT}/tcp
@@ -74,8 +75,9 @@ systemctl reload firewalld
 }
 
 function firewall_cfg_iptables {
-iptables -A INPUT -p tcp --sport ${OC_PORT} -j ACCEPT
-iptables -A INPUT -p tcp --sport ${SSH_PORT} -j ACCEPT
+echo -e "${BLUE}Configuring firewall: \"iptables\"${DECOLOR}"
+iptables -A INPUT -p tcp --dport ${OC_PORT} -j ACCEPT
+iptables -A INPUT -p tcp --dport ${SSH_PORT} -j ACCEPT
 iptables -A FORWARD -s ${NETWORK}/24 -j ACCEPT
 iptables -A FORWARD -d ${NETWORK}/24 -j ACCEPT
 iptables -t nat -A POSTROUTING -j MASQUERADE
@@ -151,7 +153,7 @@ if [[ -z $FW ]]; then
     [[ "$(os)" == "centos" ]] && firewall_cfg_firewalld >/dev/null 2>&1
     [[ "$(os)" == "fedora" ]] && firewall_cfg_firewalld >/dev/null 2>&1
 else
-    firewall_cfg_$1 >/dev/null 2>&1
+    firewall_cfg_$FW >/dev/null 2>&1
 fi
 
 echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
