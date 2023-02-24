@@ -96,7 +96,7 @@ while (( $# > 0 )); do
     case $1 in
     --firewall|-fw)
         shift
-        if [[ $FW == "iptables" ]] || [[ $FW == "ufw" ]] || [[ $FW == "firewalld" ]]; then
+        if [[ $1 == "iptables" ]] || [[ $1 == "ufw" ]] || [[ $1 == "firewalld" ]]; then
             FW=$1
         else
             echo -e "${RED}Invalid firewall name.${DECOLOR}"
