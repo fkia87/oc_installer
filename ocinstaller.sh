@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2068,SC1090,SC2001
 
 [[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
 
@@ -16,12 +17,12 @@ Check if \"Git\" is installed and your internet connection is OK." >&2; \
 fi
 
 for file in ${files[@]}; do
-    source $file
+    source "$file"
 done
 
 OCCONF=/etc/ocserv/ocserv.conf
 
-function firewall_cfg_ufw {
+firewall_cfg_ufw() {
 echo -e "${BLUE}Configuring firewall: \"ufw\"...${DECOLOR}"
 if ! grep -e "-A POSTROUTING -s $NETWORK/24 -o $MAINIF -j MASQUERADE" \
   /etc/ufw/before.rules >/dev/null 2>&1; then
@@ -59,34 +60,33 @@ if ! grep -e "-A ufw-before-forward -d $NETWORK/24 -j ACCEPT" \
 fi
 
 echo -e "${BLUE}Opening ports...${DECOLOR}"
-ufw allow ${SSH_PORT},${OC_PORT}/tcp > /dev/null 2>&1
+ufw allow "${SSH_PORT}","${OC_PORT}"/tcp > /dev/null 2>&1
 sed -i 's/ENABLED=no/ENABLED=yes/' /etc/ufw/ufw.conf
 systemctl restart ufw
 }
 
-function firewall_cfg_firewalld {
+firewall_cfg_firewalld() {
 echo -e "${BLUE}Configuring firewall: \"firewalld\"...${DECOLOR}"
 firewall-cmd --version > /dev/null 2>&1 || { install_pkg firewalld; systemctl enable --now firewalld; }
-firewall-cmd --permanent --add-port=${OC_PORT}/tcp
-firewall-cmd --permanent --add-port=${SSH_PORT}/tcp
-firewall-cmd --permanent --add-rich-rule=\
-"rule family="ipv4" source address="$NETWORK/24" masquerade"
+firewall-cmd --permanent --add-port="${OC_PORT}"/tcp
+firewall-cmd --permanent --add-port="${SSH_PORT}"/tcp
+firewall-cmd --permanent --add-rich-rule="rule family=\"ipv4\" source address=\"$NETWORK/24\" masquerade"
 systemctl reload firewalld
 }
 
-function firewall_cfg_iptables {
+firewall_cfg_iptables() {
 echo -e "${BLUE}Configuring firewall: \"iptables\"...${DECOLOR}"
-iptables -A INPUT -p tcp --dport ${OC_PORT} -j ACCEPT
-iptables -A INPUT -p tcp --dport ${SSH_PORT} -j ACCEPT
-iptables -A FORWARD -s ${NETWORK}/24 -j ACCEPT
-iptables -A FORWARD -d ${NETWORK}/24 -j ACCEPT
+iptables -A INPUT -p tcp --dport "${OC_PORT}" -j ACCEPT
+iptables -A INPUT -p tcp --dport "${SSH_PORT}" -j ACCEPT
+iptables -A FORWARD -s "${NETWORK}"/24 -j ACCEPT
+iptables -A FORWARD -d "${NETWORK}"/24 -j ACCEPT
 iptables -t nat -A POSTROUTING -j MASQUERADE
 mkdir -p /etc/iptables/
 iptables-save > /etc/iptables/rules.v4 || \
 echo -e "${RED}WARNING: \"iptables-save\" didn't work! rules will be lost after reboot!${DECOLOR}"
 }
 
-function print_help {
+print_help() {
 echo -e "\nUsage:                                $0 [-fw <firewall_name>] [-h]\n"
 echo -e "Switches:\n"
 echo "-fw, --firewall                       The name of the firewall you are currently using if needed"
@@ -96,19 +96,19 @@ echo -e "-h, --help                            Print this help\n"
 # Processing switches #################################################################################
 while (( $# > 0 )); do
     case $1 in
-    --firewall|-fw)
-        shift
-        if [[ $1 == "iptables" ]] || [[ $1 == "ufw" ]] || [[ $1 == "firewalld" ]]; then
-            FW=$1
-        else
-            echo -e "${RED}Invalid firewall name.${DECOLOR}"
-            echo -e "${RED}Use either \"iptables\", \"ufw\" or \"firewalld\".${DECOLOR}"
-            exit 1
-        fi
-        shift
-        ;;
-    --help|-h)
-        print_help
+        --firewall|-fw)
+            shift
+            if [[ $1 == "iptables" ]] || [[ $1 == "ufw" ]] || [[ $1 == "firewalld" ]]; then
+                FW=$1
+            else
+                echo -e "${RED}Invalid firewall name.${DECOLOR}"
+                echo -e "${RED}Use either \"iptables\", \"ufw\" or \"firewalld\".${DECOLOR}"
+                exit 1
+            fi
+            shift
+            ;;
+        --help|-h)
+            print_help
     esac
 done
 
@@ -121,26 +121,25 @@ enable_ipforward
 [[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils ocserv
 
 echo -e "${BLUE}"
-read -p "Please enter your current ssh port number: [22] " SSH_PORT
+read -p -r "Please enter your current ssh port number: [22] " SSH_PORT
 [[ -z $SSH_PORT ]] && SSH_PORT=22
-read -p "Please enter port number for OpenConnect server: [4444] " OC_PORT
+read -p -r "Please enter port number for OpenConnect server: [4444] " OC_PORT
 [[ -z $OC_PORT ]] && OC_PORT=4444
-read -p "Please enter maximum number of same clients: [2] " SAME_CLIENTS
+read -p -r "Please enter maximum number of same clients: [2] " SAME_CLIENTS
 [[ -z $SAME_CLIENTS ]] && SAME_CLIENTS=2
-read -p "Please enter domain name: [oc.example.com] " DOMAIN
+read -p -r "Please enter domain name: [oc.example.com] " DOMAIN
 [[ -z $DOMAIN ]] && DOMAIN=oc.example.com
-EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
-read -p "Enter VPN server local IP address: [192.168.20.1] " IP
+# EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
+read -p -r "Enter VPN server local IP address: [192.168.20.1] " IP
 [[ -z $IP ]] && IP=192.168.20.1
-while ! check_ipprivate $IP
+while ! check_ipprivate "$IP"
 do
     echo -e "${RED}Please enter a class C private IP address."
-    echo -e "You can use an IP address within the range \
-${BRED}192.168.0.0${RED} to ${BRED}192.168.255.255${RED}.${BLUE}"
-    read -p "Enter VPN server local IP address: [192.168.20.1] " IP
+    echo -e "You can use an IP address within the range ${BRED}192.168.0.0${RED} to ${BRED}192.168.255.255${RED}.${BLUE}"
+    read -p -r "Enter VPN server local IP address: [192.168.20.1] " IP
     [[ -z $IP ]] && IP=192.168.20.1
 done
-NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< $IP)
+NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< "$IP")
 NETMASK=255.255.255.0
 echo -e "Netmask is set to $NETMASK.${DECOLOR}"
 
@@ -151,7 +150,7 @@ if [[ -z $FW ]]; then
     [[ "$(os)" == "centos" ]] && firewall_cfg_firewalld
     [[ "$(os)" == "fedora" ]] && firewall_cfg_firewalld
 else
-    firewall_cfg_$FW
+    firewall_cfg_"$FW"
 fi
 
 echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
@@ -214,10 +213,10 @@ echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
 sed -i 's/^\s*server-cert\s*=\s*.*/#&/g' $OCCONF
 sed -i 's/^\s*server-key\s*=\s*.*/#&/g' $OCCONF
 sed -i 's/^\s*ca-cert\s*=\s*.*/#&/g' $OCCONF
-cat << EOF >> $OCCONF
-server-cert = /etc/pki/ocserv/public/server.crt
-server-key = /etc/pki/ocserv/private/server.key
-ca-cert = /etc/pki/ocserv/cacerts/ca.crt
+cat <<- EOF >> $OCCONF
+    server-cert = /etc/pki/ocserv/public/server.crt
+    server-key = /etc/pki/ocserv/private/server.key
+    ca-cert = /etc/pki/ocserv/cacerts/ca.crt
 EOF
 
 echo -e "${BLUE}Restarting ocserv service...${DECOLOR}"
