@@ -121,22 +121,22 @@ enable_ipforward
 [[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils ocserv
 
 echo -e "${BLUE}"
-read -p -r "Please enter your current ssh port number: [22] " SSH_PORT
+read -r -p "Please enter your current ssh port number: [22] " SSH_PORT
 [[ -z $SSH_PORT ]] && SSH_PORT=22
-read -p -r "Please enter port number for OpenConnect server: [4444] " OC_PORT
+read -r -p "Please enter port number for OpenConnect server: [4444] " OC_PORT
 [[ -z $OC_PORT ]] && OC_PORT=4444
-read -p -r "Please enter maximum number of same clients: [2] " SAME_CLIENTS
+read -r -p "Please enter maximum number of same clients: [2] " SAME_CLIENTS
 [[ -z $SAME_CLIENTS ]] && SAME_CLIENTS=2
-read -p -r "Please enter domain name: [oc.example.com] " DOMAIN
+read -r -p "Please enter domain name: [oc.example.com] " DOMAIN
 [[ -z $DOMAIN ]] && DOMAIN=oc.example.com
 # EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
-read -p -r "Enter VPN server local IP address: [192.168.20.1] " IP
+read -r -p "Enter VPN server local IP address: [192.168.20.1] " IP
 [[ -z $IP ]] && IP=192.168.20.1
 while ! check_ipprivate "$IP"
 do
     echo -e "${RED}Please enter a class C private IP address."
     echo -e "You can use an IP address within the range ${BRED}192.168.0.0${RED} to ${BRED}192.168.255.255${RED}.${BLUE}"
-    read -p -r "Enter VPN server local IP address: [192.168.20.1] " IP
+    read -r -p "Enter VPN server local IP address: [192.168.20.1] " IP
     [[ -z $IP ]] && IP=192.168.20.1
 done
 NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< "$IP")
