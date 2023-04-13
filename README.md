@@ -13,3 +13,5 @@ This script works only on:
 * Optionally edit CN or Organization information in `templates/`.
 
 * Run `ocinstaller.sh` and follow the instructions.
+
+* For more info run `ocinstaller.sh --help`
