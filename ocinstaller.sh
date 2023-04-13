@@ -1,26 +1,27 @@
 #!/bin/bash
 # shellcheck disable=SC2068,SC1090,SC2001
 
-[[ $UID == "0" ]] || { echo "You are not root."; exit 1; }
+# IMPORT REQUIREMENTS ############################################################################################
+requirements=("resources/bash_colors" "resources/utils" "resources/loading")
+for ((i=0; i<${#requirements[@]}; i++)); do
+    if ! [[ -d resources ]] || ! [[ -f ${requirements[i]} ]]; then
+        rm -rf resources
+        wget https://github.com/fkia87/resources/archive/refs/heads/master.zip || \
+        { echo -e "Error downloading required files from Github." >&2; exit 1; }
+        unzip master.zip || { echo -e "Command \"unzip master.zip\" failed." >&2; exit 1; }
+        mv resources* resources
+        break
+    fi
+done
 
-files=("resources/pkg_management" "resources/os" "resources/network" "resources/bash_colors")
-
-if ! [[ -f ${files[0]} ]] \
-|| ! [[ -f ${files[1]} ]] \
-|| ! [[ -f ${files[2]} ]] \
-|| ! [[ -f ${files[3]} ]]; then
-    rm -rf resources
-    git clone https://github.com/fkia87/resources.git || \
-    { echo -e "Error downloading required files from Github.
-Check if \"Git\" is installed and your internet connection is OK." >&2; \
-    exit 1; }
-fi
-
-for file in ${files[@]}; do
+for file in ${requirements[@]}; do
     source "$file"
 done
 
+##################################################################################################################
+
 OCCONF=/etc/ocserv/ocserv.conf
+keys_dir=/etc/pki/ocserv
 
 firewall_cfg_ufw() {
 echo -e "${BLUE}Configuring firewall: \"ufw\"...${DECOLOR}"
@@ -89,23 +90,54 @@ echo -e "${RED}WARNING: \"iptables-save\" didn't work! rules will be lost after 
 print_help() {
 echo -e "\nUsage:                                $0 [-fw <firewall_name>] [-h]\n"
 echo -e "Switches:\n"
-echo "-fw, --firewall                       The name of the firewall you are currently using if needed"
+echo -e "-fw, --firewall                       The name of the firewall you are currently using"
+echo -e "                                      Supported values: ufw, firewalld, iptables"
 echo -e "-h, --help                            Print this help\n"
+}
+
+# Generate CA
+gen_ca() {
+    certtool --generate-privkey --outfile $keys_dir/private/ca.key >/dev/null 2>&1
+    cp templates/ca.tmpl $keys_dir/cacerts/ca.tmpl
+    certtool --generate-self-signed \
+    --load-privkey $keys_dir/private/ca.key \
+    --template $keys_dir/cacerts/ca.tmpl \
+    --outfile $keys_dir/cacerts/ca.crt >/dev/null 2>&1
+}
+
+# Generating a local server certificate
+gen_server_crt() {
+    certtool --generate-privkey --outfile $keys_dir/private/server.key >/dev/null 2>&1
+    cp templates/server.tmpl $keys_dir/public/server.tmpl
+    certtool --generate-certificate \
+    --load-privkey $keys_dir/private/server.key \
+    --load-ca-certificate $keys_dir/cacerts/ca.crt \
+    --load-ca-privkey $keys_dir/private/ca.key \
+    --template $keys_dir/public/server.tmpl \
+    --outfile $keys_dir/public/server.crt >/dev/null 2>&1
+}
+
+# Generating the client certificates
+gen_user_crt() {
+    certtool --generate-privkey --outfile user.key >/dev/null 2>&1
+    cp templates/user.tmpl $keys_dir/public/user.tmpl
+    certtool --generate-certificate --load-privkey user.key \
+    --load-ca-certificate $keys_dir/cacerts/ca.crt \
+    --load-ca-privkey $keys_dir/private/ca.key \
+    --template $keys_dir/public/user.tmpl \
+    --outfile $keys_dir/public/user.crt >/dev/null 2>&1   
 }
 
 # Processing switches #################################################################################
 while (( $# > 0 )); do
     case $1 in
         --firewall|-fw)
-            shift
-            if [[ $1 == "iptables" ]] || [[ $1 == "ufw" ]] || [[ $1 == "firewalld" ]]; then
-                FW=$1
+            if [[ $2 == "iptables" ]] || [[ $2 == "ufw" ]] || [[ $2 == "firewalld" ]]; then
+                FW=$2
             else
-                echo -e "${RED}Invalid firewall name.${DECOLOR}"
-                echo -e "${RED}Use either \"iptables\", \"ufw\" or \"firewalld\".${DECOLOR}"
-                exit 1
+                err "${RED}Unsupported firewall name. Run \"$0 -h\" for more info.${DECOLOR}"
             fi
-            shift
+            shift 2
             ;;
         --help|-h)
             print_help
@@ -113,6 +145,7 @@ while (( $# > 0 )); do
 done
 
 #######################################################################################################
+checkuser
 
 enable_ipforward
 
@@ -120,7 +153,6 @@ enable_ipforward
 [[ "$(os)" == "centos" ]] && install_pkg gnutls-utils epel-release ocserv
 [[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils ocserv
 
-echo -e "${BLUE}"
 read -r -p "Please enter your current ssh port number: [22] " SSH_PORT
 [[ -z $SSH_PORT ]] && SSH_PORT=22
 read -r -p "Please enter port number for OpenConnect server: [4444] " OC_PORT
@@ -132,16 +164,16 @@ read -r -p "Please enter domain name: [oc.example.com] " DOMAIN
 # EMAIL=admin@$(sed -e 's/^[[:alnum:]]*\.//' <<< $DOMAIN)
 read -r -p "Enter VPN server local IP address: [192.168.20.1] " IP
 [[ -z $IP ]] && IP=192.168.20.1
-while ! check_ipprivate "$IP"
-do
+while ! check_ipprivate "$IP"; do
     echo -e "${RED}Please enter a class C private IP address."
-    echo -e "You can use an IP address within the range ${BRED}192.168.0.0${RED} to ${BRED}192.168.255.255${RED}.${BLUE}"
+    echo -e "You can use an IP address within the range ${BRED}192.168.0.0 to 192.168.255.255${RED}."
+    echo -e "${DECOLOR}"
     read -r -p "Enter VPN server local IP address: [192.168.20.1] " IP
     [[ -z $IP ]] && IP=192.168.20.1
 done
-NETWORK=$(sed -e 's/[[:digit:]]*$/0/' <<< "$IP")
-NETMASK=255.255.255.0
-echo -e "Netmask is set to $NETMASK.${DECOLOR}"
+NETWORK="$(sed -e 's/[[:digit:]]*$/0/' <<< "$IP")"
+NETMASK="255.255.255.0"
+echo -e "Netmask is set to $NETMASK."
 
 find_mainif
 
@@ -153,7 +185,15 @@ else
     firewall_cfg_"$FW"
 fi
 
-echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
+echo -e "Creating certificate directories..."
+mkdir -p $keys_dir/{cacerts,private,public}
+
+echo -e "Generating keys and certificates..."
+gen_ca
+gen_server_crt
+gen_user_crt
+
+echo -e "Configuring ocserv..."
 sed -i 's/^\s*auth\s*=\s*.*/#&/g' $OCCONF
 echo 'auth = "plain[passwd=/etc/ocserv/ocpasswd]"' >> $OCCONF
 sed -i 's/^\s*tcp-port\s*=\s*.*/#&/g' $OCCONF
@@ -175,51 +215,15 @@ sed -i 's/^\s*dns\s*=\s*.*/#&/g' $OCCONF
 echo -e "dns = 8.8.8.8\ndns = 4.2.2.4" >> $OCCONF
 sed -i 's/^\s*route\s*=\s*.*/#&/g' $OCCONF
 sed -i 's/^\s*no-route\s*=\s*.*/#&/g' $OCCONF
-echo -e "${BLUE}Restarting ocserv service...${DECOLOR}"
-systemctl restart ocserv
-
-echo -e "${BLUE}Creating certificate directories..."
-mkdir -p /etc/pki/ocserv/{cacerts,private,public}
-
-echo -e "Generating keys and certificates...${DECOLOR}"
-# Generate CA
-certtool --generate-privkey --outfile /etc/pki/ocserv/private/ca.key >/dev/null 2>&1
-cp templates/ca.tmpl /etc/pki/ocserv/cacerts/ca.tmpl
-certtool --generate-self-signed \
---load-privkey /etc/pki/ocserv/private/ca.key \
---template /etc/pki/ocserv/cacerts/ca.tmpl \
---outfile /etc/pki/ocserv/cacerts/ca.crt >/dev/null 2>&1
-
-# Generating a local server certificate
-certtool --generate-privkey --outfile /etc/pki/ocserv/private/server.key >/dev/null 2>&1
-cp templates/server.tmpl /etc/pki/ocserv/public/server.tmpl
-certtool --generate-certificate \
---load-privkey /etc/pki/ocserv/private/server.key \
---load-ca-certificate /etc/pki/ocserv/cacerts/ca.crt \
---load-ca-privkey /etc/pki/ocserv/private/ca.key \
---template /etc/pki/ocserv/public/server.tmpl \
---outfile /etc/pki/ocserv/public/server.crt >/dev/null 2>&1
-
-# Generating the client certificates
-certtool --generate-privkey --outfile user.key >/dev/null 2>&1
-cp templates/user.tmpl /etc/pki/ocserv/public/user.tmpl
-certtool --generate-certificate --load-privkey user.key \
---load-ca-certificate /etc/pki/ocserv/cacerts/ca.crt \
---load-ca-privkey /etc/pki/ocserv/private/ca.key \
---template /etc/pki/ocserv/public/user.tmpl \
---outfile /etc/pki/ocserv/public/user.crt >/dev/null 2>&1
-
-echo -e "${BLUE}Configuring ocserv...${DECOLOR}"
+echo -e "Restarting ocserv service..."
 sed -i 's/^\s*server-cert\s*=\s*.*/#&/g' $OCCONF
 sed -i 's/^\s*server-key\s*=\s*.*/#&/g' $OCCONF
 sed -i 's/^\s*ca-cert\s*=\s*.*/#&/g' $OCCONF
 cat <<- EOF >> $OCCONF
-    server-cert = /etc/pki/ocserv/public/server.crt
-    server-key = /etc/pki/ocserv/private/server.key
-    ca-cert = /etc/pki/ocserv/cacerts/ca.crt
+    server-cert = $keys_dir/public/server.crt
+    server-key = $keys_dir/private/server.key
+    ca-cert = $keys_dir/cacerts/ca.crt
 EOF
-
-echo -e "${BLUE}Restarting ocserv service...${DECOLOR}"
 systemctl enable ocserv
 systemctl restart ocserv && echo -e "${GREEN}\n\
 Successfully installed and configured \"ocserv\".\n
