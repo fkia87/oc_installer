@@ -229,9 +229,9 @@ sed -i 's/^\s*server-cert\s*=\s*.*/#&/g' $OCCONF
 sed -i 's/^\s*server-key\s*=\s*.*/#&/g' $OCCONF
 sed -i 's/^\s*ca-cert\s*=\s*.*/#&/g' $OCCONF
 cat <<- EOF >> $OCCONF
-    server-cert = $keys_dir/public/server.crt
-    server-key = $keys_dir/private/server.key
-    ca-cert = $keys_dir/cacerts/ca.crt
+server-cert = $keys_dir/public/server.crt
+server-key = $keys_dir/private/server.key
+ca-cert = $keys_dir/cacerts/ca.crt
 EOF
 systemctl enable ocserv
 systemctl restart ocserv && echo -e "${GREEN}\n\
