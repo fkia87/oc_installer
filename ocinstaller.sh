@@ -2,7 +2,7 @@
 # shellcheck disable=SC2068,SC1090,SC2001
 
 # IMPORT REQUIREMENTS ############################################################################################
-requirements=("resources/bash_colors" "resources/utils" "resources/loading")
+requirements=("resources/bash_colors" "resources/utils" "resources/loading" "resources/network")
 for ((i=0; i<${#requirements[@]}; i++)); do
     if ! [[ -d resources ]] || ! [[ -f ${requirements[i]} ]]; then
         rm -rf resources
@@ -149,11 +149,17 @@ checkuser
 
 enable_ipforward
 
-[[ "$(os)" == "ubuntu" ]] && install_pkg gnutls-bin ocserv
-[[ "$(os)" == "centos" ]] && install_pkg gnutls-utils epel-release ocserv
-[[ "$(os)" == "almalinux" ]] && install_pkg gnutls-utils epel-release ocserv
-[[ "$(os)" == "rocky" ]] && install_pkg gnutls-utils epel-release ocserv
-[[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils ocserv
+case $(os) in
+    ubuntu)
+        install_pkg gnutls-bin ocserv
+        ;;
+    centos | almalinux | rocky)
+        install_pkg gnutls-utils epel-release && install_pkg ocserv
+        ;;
+    fedora)
+        install_pkg gnutls-utils ocserv
+        ;;
+esac
 
 read -r -p "Please enter your current ssh port number: [22] " SSH_PORT
 [[ -z $SSH_PORT ]] && SSH_PORT=22
