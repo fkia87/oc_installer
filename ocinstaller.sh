@@ -77,10 +77,10 @@ systemctl reload firewalld
 
 firewall_cfg_iptables() {
 echo -e "${BLUE}Configuring firewall: \"iptables\"...${DECOLOR}"
-iptables -A INPUT -p tcp --dport "${OC_PORT}" -j ACCEPT
-iptables -A INPUT -p tcp --dport "${SSH_PORT}" -j ACCEPT
-iptables -A FORWARD -s "${NETWORK}"/24 -j ACCEPT
-iptables -A FORWARD -d "${NETWORK}"/24 -j ACCEPT
+iptables -I INPUT -p tcp --dport "${OC_PORT}" -j ACCEPT
+iptables -I INPUT -p tcp --dport "${SSH_PORT}" -j ACCEPT
+iptables -I FORWARD -s "${NETWORK}"/24 -j ACCEPT
+iptables -I FORWARD -d "${NETWORK}"/24 -j ACCEPT
 iptables -t nat -A POSTROUTING -j MASQUERADE
 mkdir -p /etc/iptables/
 iptables-save > /etc/iptables/rules.v4
