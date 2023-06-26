@@ -83,8 +83,8 @@ iptables -A FORWARD -s "${NETWORK}"/24 -j ACCEPT
 iptables -A FORWARD -d "${NETWORK}"/24 -j ACCEPT
 iptables -t nat -A POSTROUTING -j MASQUERADE
 mkdir -p /etc/iptables/
-iptables-save > /etc/iptables/rules.v4 || \
-echo -e "${RED}WARNING: \"iptables-save\" didn't work! rules will be lost after reboot!${DECOLOR}"
+iptables-save > /etc/iptables/rules.v4
+[[ -f /etc/sysconfig/iptables ]] && iptables-save > /etc/sysconfig/iptables
 }
 
 print_help() {
@@ -151,6 +151,8 @@ enable_ipforward
 
 [[ "$(os)" == "ubuntu" ]] && install_pkg gnutls-bin ocserv
 [[ "$(os)" == "centos" ]] && install_pkg gnutls-utils epel-release ocserv
+[[ "$(os)" == "almalinux" ]] && install_pkg gnutls-utils epel-release ocserv
+[[ "$(os)" == "rocky" ]] && install_pkg gnutls-utils epel-release ocserv
 [[ "$(os)" == "fedora" ]] && install_pkg gnutls-utils ocserv
 
 read -r -p "Please enter your current ssh port number: [22] " SSH_PORT
@@ -181,6 +183,7 @@ if [[ -z $FW ]]; then
     [[ "$(os)" == "ubuntu" ]] && firewall_cfg_ufw
     [[ "$(os)" == "centos" ]] && firewall_cfg_firewalld
     [[ "$(os)" == "fedora" ]] && firewall_cfg_firewalld
+    [[ "$(os)" == "almalinux" ]] && firewall_cfg_iptables
 else
     firewall_cfg_"$FW"
 fi
