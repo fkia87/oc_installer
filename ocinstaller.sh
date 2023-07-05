@@ -83,7 +83,7 @@ iptables -I FORWARD -s "${NETWORK}"/24 -j ACCEPT
 iptables -I FORWARD -d "${NETWORK}"/24 -j ACCEPT
 iptables -t nat -A POSTROUTING -j MASQUERADE
 mkdir -p /etc/iptables/
-iptables-save > /etc/iptables/rules.v4
+[[ -f /etc/iptables/rules.v4 ]] && iptables-save > /etc/iptables/rules.v4
 [[ -f /etc/sysconfig/iptables ]] && iptables-save > /etc/sysconfig/iptables
 }
 
