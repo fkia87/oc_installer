@@ -93,6 +93,7 @@ echo -e "Switches:\n"
 echo -e "-fw, --firewall                       The name of the firewall you are currently using"
 echo -e "                                      Supported values: ufw, firewalld, iptables"
 echo -e "-h, --help                            Print this help\n"
+exit
 }
 
 # Generate CA
