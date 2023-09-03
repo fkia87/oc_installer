@@ -92,6 +92,10 @@ echo -e "\nUsage:                                $0 [-fw <firewall_name>] [-h]\n
 echo -e "Switches:\n"
 echo -e "-fw, --firewall                       The name of the firewall you are currently using"
 echo -e "                                      Supported values: ufw, firewalld, iptables"
+echo -e "                                      Defaults:"
+echo -e "                                      - ufw in Ubuntu"
+echo -e "                                      - firewalld in Centos and Fedora"
+echo -e "                                      - iptables in Almalinux"
 echo -e "-h, --help                            Print this help\n"
 exit
 }
